@@ -88,7 +88,6 @@ def transmon_hamiltonian(Ec=0.386, EjEc=45, nstates=8, ng=0.0, T=10.0):
     do = up.T
     H0 = qutip.Qobj(np.diag(4 * Ec * (n - ng) ** 2) - Ej * (up + do) / 2.0)
     H1 = qutip.Qobj(-2 * np.diag(n))
-
     return [H0, [H1, eps0]]
 
 def logical_basis(H):

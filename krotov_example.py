@@ -21,8 +21,8 @@ hamiltonianJson = {
             "0": 2
         },
         "vars": {
-            "omega0": 6.2831853,
-            "omegaa": 0.0314159
+            "omega0": 1.0,
+            "omegaa": 1.0
         } 
 }
 
@@ -35,16 +35,16 @@ loadResult = model.loadHamiltonianJson(json.dumps(hamiltonianJson))
 if loadResult is True :
     qpu = xacc.getAccelerator('QuaC', {'system-model': model.name()})    
     channelConfigs = xacc.BackendChannelConfigs()
-    T = 100.0 
-    channelConfigs.dt = 1.0
-
-    # Resonance: f = 1
-    channelConfigs.loFregs_dChannels = [1.0]
+    T = 5.0
+    channelConfigs.dt = 0.01
+    # Krotov will be able to compute things even without resonance
+    # i.e. it will figure out how to modulate things into resonance (if needed)
+    channelConfigs.loFregs_dChannels = [0.0]
     model.setChannelConfigs(channelConfigs)
    
     # Get the XASM compiler
     xasmCompiler = xacc.getCompiler('xasm');
-    # Composite to be transform to pulse: X gate
+    # Composite to be transform to pulse: X gate = H-Z-H
     ir = xasmCompiler.compile('''__qpu__ void f(qbit q) {
         H(q[0]);
         Z(q[0]);
@@ -59,12 +59,11 @@ if loadResult is True :
         # This will propagate to setOptions() then optimize()
         # calls on the optimizer implementation. 
         # Note: this is currently doing nothing
-        'method': 'krotov_optimizer',
+        'method': 'krotov',
         'max-time': T
     })
-    # This composite should be a pulse composite now
-    print(program)
-    
+   
+    # Verify the result
     # Run the simulation of the optimized pulse program
     qubitReg = xacc.qalloc(1)
     qpu.execute(qubitReg, program)
