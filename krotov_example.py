@@ -11,6 +11,11 @@ destFile = str(Path.home()) + '/.xacc/py-plugins/krotov_pulse_optim.py'
 shutil.copyfile('krotov_pulse_optim.py', destFile) 
 #########################################################################
 import xacc, json
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 
 # XACC IR transformation
 hamiltonianJson = {
@@ -33,7 +38,7 @@ model = xacc.createPulseModel()
 loadResult = model.loadHamiltonianJson(json.dumps(hamiltonianJson))
 
 if loadResult is True :
-    qpu = xacc.getAccelerator('QuaC', {'system-model': model.name()})    
+    qpu = xacc.getAccelerator('QuaC', {'system-model': model.name(), 'logging-period': 0.1})    
     channelConfigs = xacc.BackendChannelConfigs()
     T = 5.0
     channelConfigs.dt = 0.01
@@ -46,9 +51,8 @@ if loadResult is True :
     xasmCompiler = xacc.getCompiler('xasm');
     # Composite to be transform to pulse: X gate = H-Z-H
     ir = xasmCompiler.compile('''__qpu__ void f(qbit q) {
-        H(q[0]);
-        Z(q[0]);
-        H(q[0]);
+        Ry(q[0], pi/2);
+        X(q[0]); 
     }''', qpu);
     program = ir.getComposites()[0]
 
@@ -68,4 +72,26 @@ if loadResult is True :
     qubitReg = xacc.qalloc(1)
     qpu.execute(qubitReg, program)
     print(qubitReg)
+    # Retrieve time-stepping raw data
+    csvFile = qubitReg['csvFile']
+    data = np.genfromtxt(csvFile, delimiter = ',', dtype=float, names=True)
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize = (8, 5))
+    plt.tight_layout()
+    ax[0].plot(data['Time'], data['Channel0'], 'b', label = '$D_0(t)$')
+    ax[1].plot(data['Time'], data['X0'], 'b', label = '$\\langle X \\rangle$')
+    ax[1].plot(data['Time'], data['Y0'], 'g', label = '$\\langle Y \\rangle$')
+    ax[1].plot(data['Time'], data['Z0'], 'r', label = '$\\langle Z \\rangle$')
+    ax[1].plot(data['Time'], data['Population0'], 'k', label = '$Prob(1)$')
+
+    # ax[0].set_xlim([0, 5])
+    # ax[0].set_ylim([-0.1, 2.0])
+    # ax[1].set_xlim([0, 5])
+    # ax[1].set_ylim([-1.1, 1.1])
+    ax[1].legend()
+    ax[1].legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), fancybox=True, shadow=True, ncol=5)
+    ax[0].legend()
+    ax[1].set_xlabel('Time')
+    plt.gcf().subplots_adjust(bottom=0.1)
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    plt.savefig('Krotov_Pulse_Response.pdf')
 
